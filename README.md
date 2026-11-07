@@ -38,20 +38,18 @@ Also: PowerPoint decks (with speaker notes), web search for Deep and Qwen, tools
 
 ## Quick start
 
-> **INSTALL.md hasn't yet been tested on a fresh machine.** It was written and checked on the author's own setup, which grew over several weeks, but nobody has followed it from an empty WSL distribution yet. As an early user you may hit gaps: a missing package, a step out of order, a command that needs changing. Please report each one (see [Feedback and support](#feedback-and-support)), with the step and the exact error, so it can be fixed for the next person.
-
 The full steps, with the checks after each, are in **[INSTALL.md](INSTALL.md)**. In short:
 
 ```bash
 # Windows PowerShell:  wsl --install -d Ubuntu-26.04   (then work in Ubuntu)
-sudo apt install -y git curl build-essential python3.14 python3.14-venv docker.io docker-buildx
+sudo apt install -y git curl zstd build-essential python3.14 python3.14-venv docker.io docker-buildx
 sudo usermod -aG docker "$USER" && sudo systemctl enable --now docker   # then open a new terminal
 
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull gpt-oss:20b && ollama pull bge-m3 && ollama pull qwen3:1.7b
 
-git clone https://github.com/wesmail/study-assistant-share.git study-assistant && cd study-assistant
-python3.14 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
+git clone https://github.com/wesmail/study-assistant-share.git study-assistant && cd study-assistant   # private: INSTALL.md, step 4
+python3.14 -m venv .venv && .venv/bin/pip install --resume-retries 5 -r backend/requirements.txt
 scripts/build_sandbox.sh && scripts/build_office.sh
 docker pull searxng/searxng:2026.10.19-81371861f
 
@@ -62,7 +60,7 @@ scripts/start.sh                     # then open http://localhost:8000
 
 `scripts/smoke.sh` then checks the install for free: it ingests a small PDF and a deck in a scratch folder, asks Fast one question that must cite page 2, and runs code and SymPy in the sandbox.
 
-**Setup time: not yet measured from zero.** Most of it is downloading about 30 GB. At 100 Mbit/s that alone takes about 40 minutes, and the image builds and first parse add more, so plan for an afternoon. The first document you add also downloads the parser's models (4 GB).
+**Setup time, measured:** 1 h 15 min from an empty WSL distribution to a passing `scripts/smoke.sh` (Nov 7, 2026, INSTALL.md followed step by step; about 10 min of that went on two gaps fixed on the way). Most of it is downloading: pip saw about 2.5 MB/s, and the Python packages and Ollama took 35 and 15 min. That test copied the models from an existing install instead of downloading them. A first install also downloads about 20 GB of models (Ollama's 16 GB, and the parser's 4 GB with the first document): about 2¼ hours more at 2.5 MB/s, or about 15 min at 25 MB/s.
 
 ## Accounts and costs
 
@@ -114,6 +112,23 @@ The 35 gold questions are 20 about four textbooks and 15 about a 2026 paper. A b
 
 Only one local model fits in 16 GB, so switching between Fast and Balanced reloads it, which takes 20–60 s.
 
+## Hardware and models
+
+- **Fast and Balanced were chosen for a 16 GB GPU.** Each fits it on its own, beside the search models.
+- **Every measured result here comes from the author's machine and test library**:
+  - the machine: an RTX 4090 Laptop GPU with 16 GB;
+  - the library: four textbook excerpts, two papers and two slide decks;
+  - the questions: the author's own gold questions.
+
+  The answer quality, times and costs above may well differ on other hardware, with other documents, or with other questions.
+- **With a larger GPU, you can set stronger local models** in `config.yaml`:
+  1. `ollama pull` the model;
+  2. put its name in `model:` under the `fast` or `balanced` entry of `answer_options`;
+  3. set `think:` to what the model takes (gpt-oss takes `low`, `medium` or `high`; most others `true` or `false`).
+
+  The model must support tool calls in Ollama. The numbers above then no longer apply until you measure them yourself.
+- **This is a research prototype**, built and tested by one person.
+
 ## Privacy: what leaves your machine
 
 - **Fast and Balanced:** nothing. The models, search, parsing and the sandbox all run locally.
@@ -161,7 +176,7 @@ When something fails, start with `scripts/smoke.sh`, then [TROUBLESHOOTING.md](T
 - **Inline maths** is often garbled by the parser: about 2 of 15 sampled inline formulas came out right. Display equations are much better (96 of 100 shown correctly), and about 2 in 100 are misplaced without a warning, such as `h_{1:2}` read as `h_1 : 2`. The viewer always shows the original page.
 - **Slides:** text boxes are read top to bottom, left to right, so a label and its value in separate boxes can still pair up wrongly. The local summaries can also flatten details that differ between slides.
 - **Only trusted PDFs.** Library PDFs are parsed on the host by native code (PyMuPDF, Docling), not in the sandbox. Add only files from sources you trust. Decks are rendered in a container.
-- **Fresh install not yet tested.** INSTALL.md hasn't been followed from an empty WSL distribution. Its apt and Ollama installs, model pulls and image builds weren't run as written, and the author's Python environment came from micromamba, not from Ubuntu's `python3.14-venv`. Expect a rough edge or two, and please report them.
+- **Fresh install tested once.** INSTALL.md was followed from an empty WSL distribution on the author's machine (Nov 7, 2026), and `scripts/smoke.sh` passed. The model downloads weren't part of that test (the models were copied), and other machines, GPUs and Linux distributions are untested. Please report any gap you hit.
 - **One machine, one user.** It was tested on one laptop. It listens only on localhost and has no log-in, so don't expose port 8000.
 - **Web search** depends on public search engines, which rate-limit bursts. The local models have no web search: Fast followed an instruction planted in a test page in some runs, so web stays off for them.
 - **No GPU, no app.** There is no hosted-only mode.
@@ -175,10 +190,18 @@ The code is under the **GNU Affero General Public License v3.0** ([LICENSE](LICE
 
 **No books or documents ship with the repository.** You bring your own, and you are responsible for having the right to use them. `library/` and `data/` are git-ignored, except `library/metadata.yaml`, which holds titles and settings, no content.
 
+## Contributing
+
+Pull requests are welcome; see **[CONTRIBUTING.md](CONTRIBUTING.md)**. In short:
+- work on a branch, never on `main`;
+- run the tests and `scripts/smoke.sh` before you open a pull request, and say how you tested your change;
+- never commit books, keys or anyone's personal data;
+- contributions are under AGPL-3.0, like the rest.
+
 ## Feedback and support
 
 This is a research tool, maintained by one person, not a supported product. Reports are welcome:
-- **Problems and ideas:** open a GitHub issue in this repository. Say what you did, what happened, the mode, and what `scripts/smoke.sh` printed.
+- **Problems and ideas:** open a GitHub issue in this repository; the **Bug report** template asks for what you did, what happened, the mode, and what `scripts/smoke.sh` printed.
 - **A bad answer:** rate it 👎 with a note, then copy the entry from the **Feedback** list into an issue. The feedback list never leaves your machine by itself.
 - **Leave out of issues:** keys, and text from books you can't share.
 

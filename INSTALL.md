@@ -17,12 +17,21 @@ From an empty WSL distribution to a first answer. Every step is needed unless it
   The optional models need more: Balanced 15 GB, the summary tree's model 17 GB.
 - Keep the project and its data under `/home`, never under `/mnt/c` or `/mnt/d`: Windows drives are slow from WSL and can't keep Linux file permissions.
 - For Deep and Qwen only: an Anthropic and an OpenRouter API key. Everything else is free and local.
+- Time: measured from an empty WSL distribution to a passing smoke test, 1 h 15 min without the model downloads (Nov 7, 2026, at about 2.5 MB/s); the models add about 20 GB of downloads. Details in the README's Quick start.
 
 ## 1. WSL and Ubuntu
 
 ```
 PS> wsl --install -d Ubuntu-26.04
 ```
+
+If you already have an Ubuntu-26.04 distribution, give the new one its own name instead, so your existing one stays as it is, and open it with `wsl -d study-assistant`:
+
+```
+PS> wsl --install -d Ubuntu-26.04 --name study-assistant
+```
+
+All WSL distributions share one network. If another one already runs Ollama, SearXNG or this app, stop them there before you start them in the new one, or the new one quietly uses the old one's (ports 11434, 8888 and 8000).
 
 Create your user when it asks. Then, in Ubuntu, check that the GPU is visible and that systemd is on:
 
@@ -42,7 +51,7 @@ systemd=true
 
 ```bash
 sudo apt update
-sudo apt install -y git curl build-essential python3.14 python3.14-venv docker.io docker-buildx
+sudo apt install -y git curl zstd build-essential python3.14 python3.14-venv docker.io docker-buildx
 sudo usermod -aG docker "$USER"            # use Docker without sudo
 sudo systemctl enable --now docker
 ```
@@ -76,15 +85,17 @@ Without the summary model, ingestion still makes every document searchable; only
 
 ## 4. The project
 
+The repository is private: you need an invitation to it on GitHub first. To clone it, sign in with the GitHub CLI (`sudo apt install -y gh`, then `gh auth login`), or, when `git clone` asks for a password, give a personal access token from GitHub's settings; your GitHub password won't work.
+
 ```bash
 cd ~
 git clone https://github.com/wesmail/study-assistant-share.git study-assistant
 cd study-assistant
 python3.14 -m venv .venv
-.venv/bin/pip install -r backend/requirements.txt
+.venv/bin/pip install --resume-retries 5 -r backend/requirements.txt
 ```
 
-The requirements bring PyTorch with its CUDA libraries, and Node.js for the frontend (`nodejs-wheel`), so neither needs installing separately. They are several GB, so allow some minutes. Check the GPU from Python:
+`--resume-retries` picks a large download up where it broke off, instead of failing: PyTorch alone is over 500 MB. The requirements bring PyTorch with its CUDA libraries, and Node.js for the frontend (`nodejs-wheel`), so neither needs installing separately. They are several GB, so allow some minutes. Check the GPU from Python:
 
 ```bash
 .venv/bin/python -c "import torch; print(torch.cuda.is_available())"     # True

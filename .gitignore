@@ -1,0 +1,14 @@
+.env
+library/*
+!library/metadata.yaml
+.venv/
+data/
+outputs/
+__pycache__/
+.pytest_cache/
+eval/spot_check/
+eval/needed_facts/
+eval/grading/
+.claude/settings.local.json
+eval/results/tools-smoke-*
+eval/results/tools-dev-*

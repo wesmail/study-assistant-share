@@ -1,0 +1,13 @@
+# What the app shows for each document: in the library, in chat sources, and in the
+# footers and source lists of generated files. The file name is never shown.
+# Keyed by file name in the library folder. Edit freely; the app rereads this file.
+# The library pane's details form writes here too.
+#
+# Every field is optional. An example, for a deck whose first slide stays private:
+#
+# "my-talk.pptx":
+#   title: "Lectures on quantum field theory"
+#   author: "A. Author, B. Author"
+#   year: 2026
+#   publisher: "Example Press"
+#   exclude_pages: [1]      # never searched, never sent to a hosted model; the viewer still shows it

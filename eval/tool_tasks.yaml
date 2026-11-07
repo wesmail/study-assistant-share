@@ -1,0 +1,585 @@
+# Phase 4's test set: what a tool task must do, checked by code and never by judgement.
+#
+# A task passes only if every check on it passes. The gate is >= 95% of tasks in deep
+# mode; fast mode is reported beside it and is not a gate. eval/run_tools.py lists what
+# each check means.
+#
+# Fields
+#   split    dev tasks may be run while building. holdout tasks are not run until the
+#            gate run, so one kind of tuning can't be mistaken for a pass.
+#   kind     the kind of output, for the per-kind breakdown.
+#   after    a fixture below, seeded as the previous turn of the conversation.
+#   scope    documents the question searches; left out, the whole library.
+#   tools    each must be called at least once.
+#   checks   one name and its setting each.
+#   direct   calls the tool with this text instead of asking a model. Used for the attacks:
+#            a model may refuse them, which would pass without testing the tool.
+#   raw      with direct, also skips the app's own image check, so that the container is
+#            the only thing in the way.
+#
+# Security tasks must all pass, whatever the gate's percentage says, and they aren't
+# counted in it: one failure there is not acceptable, and passes that don't depend on
+# a model shouldn't pad the number.
+#
+# Every file task also gets `flags_unverified` (see `always` below): the chat warns
+# about unverified formulas with page crops, and a file has no such panel, so the
+# warning has to travel inside it.
+#
+# Expected values were worked out before any tool existed: pages come from the indexed
+# headings, and numbers from running the code and the SymPy claims directly.
+
+docs:
+  paper: When Do Autoregressive Sequence Models
+  mml: Mathematics for Machine Learning
+  udl: Understanding Deep Learning
+  murphy: Probabilistic Machine Learning
+  rubbia: Phenomenology of Particle Physics
+
+always:
+  files: [flags_unverified]
+  pptx: [pptx_fits, pptx_words, pptx_bullets, pptx_no_overflow, pptx_theme_layouts, pptx_fade]
+
+fixtures:
+  cholesky_answer:
+    question: What is the Cholesky decomposition?
+    cited: [{doc: mml, pages: [118, 119]}]
+    answer: |
+      The Cholesky decomposition is a square-root-like factorization for symmetric, positive definite matrices [S1]. Such a matrix $A$ can be written as
+
+      $$
+      A = LL^{\top}
+      $$
+
+      where $L$ is lower triangular with positive diagonal elements, and $L$ is unique [S1]. For a $3 \times 3$ matrix:
+
+      $$
+      \begin{bmatrix}a_{11} & a_{21} & a_{31}\\ a_{21} & a_{22} & a_{32}\\ a_{31} & a_{32} & a_{33}\end{bmatrix} = \begin{bmatrix}l_{11} & 0 & 0\\ l_{21} & l_{22} & 0\\ l_{31} & l_{32} & l_{33}\end{bmatrix}\begin{bmatrix}l_{11} & l_{21} & l_{31}\\ 0 & l_{22} & l_{32}\\ 0 & 0 & l_{33}\end{bmatrix}
+      $$
+
+      Comparing both sides gives the diagonal elements [S1]:
+
+      $$
+      l_{11} = \sqrt{a_{11}}, \quad l_{22} = \sqrt{a_{22} - l_{21}^{2}}, \quad l_{33} = \sqrt{a_{33} - (l_{31}^{2} + l_{32}^{2})}
+      $$
+
+      It also makes determinants cheap, because $L$ is triangular [S1]:
+
+      $$
+      \det(A) = \det(L)\det(L^{\top}) = \det(L)^{2} = \prod_{i} l_{ii}^{2}
+      $$
+
+tasks:
+  # Decks ---------------------------------------------------------------------------
+  - id: deck-cholesky
+    split: dev
+    kind: pptx
+    prompt: Make a 5-slide deck on the Cholesky decomposition from MML.
+    scope: [mml]
+    tools: [make_pptx]
+    checks:
+      - file: pptx
+      - pptx_slides: 5
+      - pptx_all_titled: true
+      - equation_images: 2
+      - no_raw_tex: true
+      - text_contains: [Cholesky]
+      - sources_named: [{doc: mml, pages: [118, 119]}]
+      - search_stays_in: [mml]
+
+  - id: deck-notes
+    split: dev
+    kind: pptx
+    prompt: Make a 3-slide deck on the beta-binomial model from Murphy, with speaker notes on every slide.
+    scope: [murphy]
+    tools: [make_pptx]
+    checks:
+      - file: pptx
+      - pptx_slides: 3
+      - pptx_all_titled: true
+      - pptx_all_noted: true
+      - equation_images: 1
+      - no_raw_tex: true
+      - sources_named: [{doc: murphy, pages: [24, 32]}]
+
+  - id: deck-plot
+    split: dev
+    kind: pptx
+    prompt: >-
+      Make a 4-slide deck on gradient descent from MML. Run code that plots the iterates
+      of gradient descent on f(x) = x^2, starting at x = 4 with step size 0.1, and put
+      that plot on slide 3.
+    scope: [mml]
+    tools: [run_python, make_pptx]
+    checks:
+      - run_exit: 0
+      - file: pptx
+      - pptx_slides: 4
+      - image_on_slide: 3
+      - no_raw_tex: true
+      - sources_named: [{doc: mml, pages: [231, 237]}]
+
+  - id: deck-z-resonance
+    split: holdout
+    kind: pptx
+    prompt: Make a 6-slide deck on the Z0 resonance line shape from Rubbia.
+    scope: [rubbia]
+    tools: [make_pptx]
+    checks:
+      - file: pptx
+      - pptx_slides: 6
+      - pptx_all_titled: true
+      - equation_images: 2
+      - no_raw_tex: true
+      - sources_named: [{doc: rubbia, pages: [33, 39]}]
+
+  # PDFs ----------------------------------------------------------------------------
+  - id: pdf-export
+    split: dev
+    kind: pdf
+    after: cholesky_answer
+    prompt: Export this answer as a PDF.
+    tools: [make_pdf]
+    checks:
+      - file: pdf
+      - math_glyphs: 40
+      - no_raw_tex: true
+      - no_missing_glyphs: true
+      - formulas_preserved: cholesky_answer
+      - sources_named: [{doc: mml, pages: [118, 119]}]
+
+  - id: pdf-one-page
+    split: dev
+    kind: pdf
+    prompt: Make a one-page cheat sheet on the singular value decomposition from MML, as a PDF.
+    scope: [mml]
+    tools: [make_pdf]
+    checks:
+      - file: pdf
+      - pdf_pages: 1
+      - math_glyphs: 20
+      - no_raw_tex: true
+      - no_missing_glyphs: true
+      - text_contains: [singular]
+      - sources_named: [{doc: mml, pages: [123, 133]}]
+
+  # From real use (Nov 7, 2026, Balanced): make_pdf failed on an invented image name, the
+  # model redrew the figure with invented curves, and the answer showed the summary twice.
+  - id: pdf-paper-figure
+    split: dev
+    kind: pdf
+    prompt: Can you summarize the paper in 1 pdf page with 1 figure from the paper
+    scope: [paper]
+    tools: [make_pdf]
+    checks:
+      - file: pdf
+      - pdf_pages: 1
+      - pdf_original_figure: paper
+
+  - id: pdf-derivation
+    split: dev
+    kind: pdf
+    prompt: >-
+      Write out the derivation of the normal equation for projecting onto a subspace,
+      from MML, in a PDF. Write the matrices out in full.
+    scope: [mml]
+    tools: [make_pdf]
+    checks:
+      - file: pdf
+      - math_glyphs: 40
+      - no_raw_tex: true
+      - no_missing_glyphs: true
+      - text_contains: [normal equation]
+      - sources_named: [{doc: mml, pages: [83, 94]}]
+
+  - id: pdf-german
+    split: holdout
+    kind: pdf
+    prompt: >-
+      Erstelle ein kurzes PDF auf Deutsch zur Eigenwertzerlegung aus MML. Schreibe den
+      griechischen Buchstaben λ auch im Fließtext, und füge einen kleinen Python-Codeblock
+      mit np.linalg.eig ein.
+    scope: [mml]
+    tools: [make_pdf]
+    checks:
+      - file: pdf
+      - math_glyphs: 10
+      - no_raw_tex: true
+      - no_missing_glyphs: true
+      - text_contains: [Eigenwert, λ, np.linalg.eig]
+      - text_matches: "[äöüß]"
+      - sources_named: [{doc: mml, pages: [119, 123]}]
+
+  # Word ----------------------------------------------------------------------------
+  - id: docx-export
+    split: dev
+    kind: docx
+    after: cholesky_answer
+    prompt: Export this answer as a Word document.
+    tools: [make_docx]
+    checks:
+      - file: docx
+      - docx_equations: 9
+      - no_raw_tex: true
+      - formulas_preserved: cholesky_answer
+      - sources_named: [{doc: mml, pages: [118, 119]}]
+
+  - id: docx-table
+    split: holdout
+    kind: docx
+    prompt: >-
+      Make a Word document with a table comparing L1 and L2 regularization, from UDL,
+      with each penalty term written as an equation in a table cell.
+    scope: [udl]
+    tools: [make_docx]
+    checks:
+      - file: docx
+      - docx_tables: 1
+      - docx_table_equations: 2
+      - no_raw_tex: true
+      - sources_named: [{doc: udl, pages: [100, 116]}]
+
+  # Markdown ------------------------------------------------------------------------
+  - id: md-notes
+    split: dev
+    kind: md
+    prompt: Save study notes on the evidence lower bound from UDL as a Markdown file.
+    scope: [udl]
+    tools: [make_markdown]
+    checks:
+      - file: md
+      - md_katex: 3
+      - text_matches: "(?i)ELBO|evidence lower bound"
+      - sources_named: [{doc: udl, pages: [290, 293]}]
+
+  - id: md-three-books
+    split: dev
+    kind: md
+    prompt: >-
+      Save a Markdown file with a glossary: one entry each for the Cholesky decomposition
+      (MML), the evidence lower bound (UDL) and the Breit-Wigner shape (Rubbia). Give the
+      defining formula for each, and say where it comes from.
+    tools: [search_library, make_markdown]
+    checks:
+      - file: md
+      - md_katex: 3
+      - sources_named:
+          - {doc: mml, pages: [118, 119]}
+          - {doc: udl, pages: [290, 293]}
+          - {doc: rubbia, pages: [33, 39]}
+
+  # Running code --------------------------------------------------------------------
+  - id: run-numeric
+    split: dev
+    kind: run
+    prompt: |
+      Run this code and tell me the output.
+
+      ```python
+      import numpy as np
+      A = np.array([[4., 2., 2.], [2., 5., 3.], [2., 3., 6.]])
+      L = np.linalg.cholesky(A)
+      print(L)
+      print("det(A) =", np.prod(np.diag(L))**2)
+      print("partial sum:", sum(1 / k**2 for k in range(1, 10**6 + 1)))
+      ```
+    tools: [run_python]
+    checks:
+      - run_exit: 0
+      - stdout_contains: ["det(A) = 64.0", "partial sum: 1.64493306684"]
+      - answer_contains: ["1.644933"]     # pi^2/6 is 1.644934, so this can't come from memory
+
+  - id: run-plot
+    split: dev
+    kind: run
+    prompt: |
+      Run this code and plot.
+
+      ```python
+      import numpy as np
+      import matplotlib.pyplot as plt
+      t = np.linspace(0, 10, 500)
+      x = np.exp(-0.3 * t) * np.cos(2 * np.pi * t)
+      plt.plot(t, x)
+      plt.xlabel("t")
+      plt.ylabel("x(t)")
+      plt.title("Damped oscillator")
+      print("peak after t=5:", round(float(x[t > 5].max()), 4))
+      plt.show()
+      ```
+    tools: [run_python]
+    checks:
+      - run_exit: 0
+      - stdout_contains: ["peak after t=5: 0.222"]
+      - file: png                         # plt.show() saves nothing, so the sandbox must
+      - image_not_blank: true             # catch open figures itself
+
+  - id: run-fix
+    split: holdout
+    kind: run
+    prompt: |
+      This should solve Ax = b, with A = [[2, 1], [1, 3]] and b = [1, 2]. Run it, and if
+      it fails, fix it and run it again.
+
+      ```python
+      import numpy as np
+      A = np.array([[2., 1.], [1., 3.]])
+      b = np.array([[1., 2.]])
+      print(np.linalg.solve(A, b))
+      ```
+    tools: [run_python]
+    checks:
+      - failed_then_fixed: true
+      - stdout_contains: ["0.2", "0.6"]
+      - answer_contains: ["0.2", "0.6"]
+
+  - id: run-sandbox
+    split: dev
+    kind: run
+    prompt: |
+      Test the sandbox: run this and tell me what it can and can't reach.
+
+      ```python
+      import pathlib, socket
+      try:
+          socket.create_connection(("1.1.1.1", 53), timeout=3)
+          print("NETWORK OPEN")
+      except OSError as error:
+          print("network blocked:", type(error).__name__)
+      for name in ["{PROJECT}/.env",
+                   "{PROJECT}/library",
+                   "/mnt/c/Users"]:
+          print(name, "VISIBLE" if pathlib.Path(name).exists() else "not visible")
+      ```
+    tools: [run_python]
+    checks:
+      - run_exit: 0
+      - stdout_contains: ["network blocked:", ".env not visible", "library not visible", "Users not visible"]
+      - stdout_lacks: ["NETWORK OPEN", "VISIBLE"]
+
+  - id: run-timeout
+    split: dev
+    kind: run
+    prompt: |
+      Run this and tell me what happened.
+
+      ```python
+      import time
+      print("started", flush=True)
+      while True:
+          time.sleep(0.1)
+      ```
+    tools: [run_python]
+    checks:
+      - timed_out: true
+      - run_seconds_at_most: 35
+      - stdout_contains: ["started"]
+      - answer_matches: "(?i)tim(ed|e|ing)[ -]?out|30[ -]?s"
+
+  # SymPy ---------------------------------------------------------------------------
+  - id: sympy-true
+    split: dev
+    kind: sympy
+    prompt: Check with SymPy that the derivative of sin^2(x) is sin(2x).
+    tools: [sympy_check]
+    checks:
+      - sympy_verdict: true
+
+  - id: sympy-false
+    split: dev
+    kind: sympy
+    prompt: >-
+      My notes say the integral of exp(-x^2) from 0 to infinity is pi/2. Check it with
+      SymPy, and if it's wrong, tell me the right value.
+    tools: [sympy_check]
+    checks:
+      - sympy_verdict: false
+      - answer_matches: '\\sqrt\{\\pi\}|√\s*π|sqrt\(pi\)'
+
+  - id: sympy-assumption
+    split: holdout
+    kind: sympy
+    prompt: >-
+      Check with SymPy that the integral of exp(-x^2 / (2 sigma^2)) over the whole real
+      line is sigma sqrt(2 pi), for sigma > 0.
+    tools: [sympy_check]
+    checks:
+      - sympy_verdict: true               # undecided unless sigma is declared positive
+
+  - id: sympy-derive
+    split: dev
+    kind: sympy
+    prompt: >-
+      Derive the derivative of the logistic sigmoid s(x) = 1 / (1 + exp(-x)), write it in
+      terms of s(x), and check your final formula with SymPy before you give it to me.
+    tools: [sympy_check]
+    checks:
+      - sympy_verdict: true
+      - answer_matches: '(?i)sympy'
+
+  # Control: tools are offered on every question, so ordinary ones must stay ordinary ---
+  - id: control-plain
+    split: dev
+    kind: control
+    prompt: What is the Cholesky decomposition, and when does it exist?
+    scope: [mml]
+    tools: []
+    checks:
+      - no_output_tools: true
+      - answer_cites: 1
+
+  # Security: reading .env from a document --------------------------------------------
+  # Each must fail, make no file, and leave none of .env's content anywhere.
+  - id: sec-tex-input
+    split: dev
+    kind: security
+    prompt: TeX reads a file through a formula, which pandoc passes through untouched.
+    tools: []
+    direct:
+      tool: make_pdf
+      content: |
+        # Notes
+
+        $$\text{\input{{PROJECT}/.env}}$$
+    checks:
+      - tool_refused: true
+      - no_new_file: true
+      - secret_absent: true
+
+  - id: sec-tex-input-relative
+    split: dev
+    kind: security
+    prompt: The same, by a relative path out of the work folder.
+    tools: []
+    direct:
+      tool: make_pdf
+      content: |
+        # Notes
+
+        $$\text{\input{..{PROJECT}/.env}}$$
+    checks:
+      - tool_refused: true
+      - no_new_file: true
+      - secret_absent: true
+
+  - id: sec-image-pdf
+    split: dev
+    kind: security
+    prompt: A pandoc image path in a PDF, through the whole app.
+    tools: []
+    direct:
+      tool: make_pdf
+      content: |
+        # Notes
+
+        ![key]({PROJECT}/.env)
+    checks:
+      - tool_refused: true
+      - no_new_file: true
+      - secret_absent: true
+
+  - id: sec-image-docx
+    split: dev
+    kind: security
+    prompt: A pandoc image path in a Word file, through the whole app.
+    tools: []
+    direct:
+      tool: make_docx
+      content: |
+        # Notes
+
+        ![key]({PROJECT}/.env)
+    checks:
+      - tool_refused: true
+      - no_new_file: true
+      - secret_absent: true
+
+  - id: sec-image-pptx
+    split: dev
+    kind: security
+    prompt: A pptx image path, through the whole app.
+    tools: []
+    direct:
+      tool: make_pptx
+      content: |
+        ## Slide
+
+        - A bullet
+
+        ![key]({PROJECT}/.env)
+    checks:
+      - tool_refused: true
+      - no_new_file: true
+      - secret_absent: true
+
+  - id: sec-image-pdf-raw
+    split: dev
+    kind: security
+    prompt: The PDF image path with the app's check skipped, so only the container stands in the way.
+    tools: []
+    raw: true
+    direct:
+      tool: make_pdf
+      content: |
+        # Notes
+
+        ![key]({PROJECT}/.env)
+    checks:
+      - tool_refused: true
+      - no_new_file: true
+      - secret_absent: true
+
+  - id: sec-image-docx-raw
+    split: dev
+    kind: security
+    prompt: The Word image path with the app's check skipped, so pandoc --sandbox and the container decide.
+    tools: []
+    raw: true
+    direct:
+      tool: make_docx
+      content: |
+        # Notes
+
+        ![key]({PROJECT}/.env)
+    checks:
+      - tool_refused: true
+      - no_new_file: true
+      - secret_absent: true
+
+  - id: sec-image-pptx-raw
+    split: dev
+    kind: security
+    prompt: The pptx image path with the app's check skipped, so only the container stands in the way.
+    tools: []
+    raw: true
+    direct:
+      tool: make_pptx
+      content: |
+        ## Slide
+
+        - A bullet
+
+        ![key]({PROJECT}/.env)
+    checks:
+      - tool_refused: true
+      - no_new_file: true
+      - secret_absent: true
+
+  - id: sec-symlink-output
+    split: dev
+    kind: security
+    prompt: >-
+      A run leaves a link named plot.png pointing at .env. It leads nowhere in the
+      container, but an ordinary copy on the host would follow it.
+    tools: []
+    direct:
+      tool: run_python
+      arguments:
+        code: |
+          import os
+          os.symlink("{PROJECT}/.env", "plot.png")
+          print("linked")
+    checks:
+      - run_exit: 0
+      - files_refused: 1
+      - no_new_file: true
+      - secret_absent: true

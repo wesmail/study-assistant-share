@@ -1,0 +1,117 @@
+# Overrides for backend/app/config.py. Relative paths start at the project root.
+library_dir: library
+data_dir: data
+embed_model: bge-m3
+
+# Backups (scripts/backup.sh) are off until you set backup_dir to a folder for the archives.
+# Another drive is best, so a damaged WSL disk doesn't take them too, e.g. a Windows drive:
+#   backup_dir: /mnt/d/backups/study-assistant
+# The .env copies stay in backup_local_dir, under /home, where mode 600 holds (on a Windows
+# drive any Windows account could read them). Daily, the last 7 days plus 4 weekly.
+backup_local_dir: ~/backups/study-assistant
+backup_keep_daily: 7
+backup_keep_weekly: 4
+
+# LibreOffice renders decks and Word files with the reader's own fonts, mounted read-only
+# into its container; never copied into an image or the repo. Remove the line on Linux
+# without Windows, to use the image's stand-in fonts.
+office_fonts_dir: /mnt/c/Windows/Fonts
+
+chat_num_ctx: 32768      # always sent explicitly; a change reloads the model
+
+# Reranks search results on the GPU. Without the model, search keeps its own order.
+rerank_enabled: true
+
+# Dollars per million tokens, with the date each was read from its source. A hosted model
+# without a price is never called, so its cost can always be logged. Check them before
+# trusting the expected costs: prices change. Opus 5.5 and Sonnet 5.5 charge cache reads
+# at 0.05x input.
+hosted_prices:
+  claude-opus-5-5:
+    {input: 4.00, output: 20.00, cache_read: 0.20, cache_write: 5.00, checked: "2026-11-03",
+     source: "https://platform.claude.com/docs/en/about-claude/pricing"}
+  claude-sonnet-5-5:
+    {input: 2.00, output: 10.00, cache_read: 0.10, cache_write: 2.50, checked: "2026-11-03",
+     source: "https://platform.claude.com/docs/en/about-claude/pricing"}
+  qwen/qwen3.8-27b:     # at DeepInfra, the pinned provider; `api_bench.py check` reads it again
+    {input: 0.15, output: 1.875, checked: "2026-11-03",
+     source: "https://openrouter.ai/api/v1/models/qwen/qwen3.8-27b/endpoints"}
+
+# Writes the figure descriptions used for search, on demand: `python -m app.ingest.figures
+# describe`. Chosen blind on ten held-out figures: Gemma 4 and Qwen3-VL
+# misread and invented values; Sonnet 5.5 came close to Opus at a third of the cost. A
+# hosted describer asks before it runs, with the estimated cost. expected_tokens is the
+# measured mean per figure there.
+figure_describer:
+  provider: anthropic
+  model: claude-sonnet-5-5
+  effort: high
+  expected_tokens: [1302, 770]
+
+# Your own monthly spend limit, as set for the workspace in the Anthropic Console. It is only
+# shown beside this month's spend: the console's limit is what stops calls. Set it to yours.
+hosted_monthly_limits: {anthropic: 10}
+
+# Measured switching between the two local models (Nov 3, 2026): 17-61 s, because only
+# one fits in the GPU, so Ollama unloads one and reads the other from disk.
+local_switch_seconds: [20, 60]
+
+# The answer selector, in this order. The first is the default. Hosted options reset to
+# the last local choice after each question, so a hosted call is always a choice.
+# expected_seconds is the measured median per answer on the gold questions, and
+# expected_tokens the mean input and output tokens per question there, with tools off;
+# the selector prices them at today's price.
+answer_options:
+  - id: fast
+    label: Fast
+    provider: ollama
+    model: gpt-oss:20b
+    think: medium        # never "high" on gpt-oss: it loops and returns nothing
+    web: "off"           # no Web toggle: in the Phase 5d gate run it searched without opening pages
+    # Check: one attempt, badges only. Best-of-3 gave no gain on the gold derivations (round 19);
+    # the code stays (check_samples > 1). Few of its claims are checkable: a neutral badge.
+    check_samples: 1
+    check_badge: limited
+    expected_seconds: 17
+    expected_note: 35 gold questions, round 2
+
+  - id: balanced
+    label: Balanced
+    provider: ollama
+    model: gemma4:26b-a4b-it-qat
+    think: true          # Gemma takes true or false, as in the Phase 3 bake-off
+    num_predict: 16384   # thinking included; at 8K three derivations ran out in tools mode (Phase 5d)
+    vision: true         # retrieved figures and screenshots go to it as images
+    web: "off"           # no Web toggle: 2/11 good with the web tools in the Phase 5d gate run
+    check_samples: 1     # badges only; best-of-2 gave no gain (round 19)
+    check_badge: limited
+    expected_seconds: 73
+    expected_note: 35 gold questions, round 5
+
+  # Pinned to one provider at the same quantization as the model comparison bench, with
+  # fallbacks off and no provider that keeps or trains on prompts. Never falls back to
+  # another model: a failure is shown, with a one-click resend in Deep.
+  - id: qwen
+    label: Qwen
+    provider: openrouter
+    model: qwen/qwen3.8-27b
+    route: DeepInfra
+    quantization: bf16
+    sampling: {temperature: 1, top_k: 20, top_p: 0.95, min_p: 0, presence_penalty: 0}
+    reasoning: {enabled: true}
+    check_badge: unmeasured  # never run on the gold derivations with Check on: a neutral badge until it is
+    expected_seconds: 188
+    expected_note: 35 gold questions, model bench
+    expected_tokens: [5143, 7797]
+
+  # Chosen after the blind comparison in eval/results/grades-round-1.json.
+  - id: deep
+    label: Deep
+    provider: anthropic
+    model: claude-opus-5-5
+    fallback: claude-sonnet-5-5     # used if the main model fails; the badge says so
+    effort: high
+    vision: true         # retrieved figures and screenshots go to it as images
+    expected_seconds: 28
+    expected_note: 35 gold questions, round 2
+    expected_tokens: [7427, 3029]

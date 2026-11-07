@@ -1,0 +1,53 @@
+# SearXNG for the study assistant's web_search tool.
+#
+# Only this machine reaches it: scripts/searxng.sh publishes it on 127.0.0.1 alone. The
+# secret key comes from the SEARXNG_SECRET environment variable, made when the container is
+# created, so none is kept here. Everything not set below is SearXNG's own default.
+use_default_settings:
+  engines:
+    remove:               # Tor engines: they can't load without a Tor proxy
+      - ahmia
+      - torch
+
+general:
+  instance_name: "study-assistant"
+  enable_metrics: false
+
+server:
+  limiter: false          # one local user; the limiter would also need Valkey
+  public_instance: false
+  image_proxy: false
+  method: "GET"
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json                # what web_search reads
+
+outgoing:
+  request_timeout: 4.0
+  max_request_timeout: 8.0
+
+# More engines than the defaults, so one engine's rate limit doesn't empty the results: on
+# Nov 4, 2026, after a few hours of evaluation runs, Brave and Google CSE answered "too many
+# requests" and only DuckDuckGo was left. On Nov 5 Google and Qwant answered "access denied"
+# too, and Bing, the one left, matched only the first word ("W boson mass" found WhatsApp),
+# so Bing is off and Yahoo, Seznam, Mojeek and Startpage are on. Yandex worked as well but
+# is left off: it would see every query.
+engines:
+  - name: bing
+    disabled: true
+  - name: qwant
+    disabled: false
+  - name: google
+    disabled: false
+  - name: yahoo
+    disabled: false
+  - name: seznam
+    disabled: false
+  - name: mojeek
+    disabled: false
+  - name: startpage
+    disabled: false

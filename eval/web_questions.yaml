@@ -1,0 +1,193 @@
+# Questions for web search as a tool, kept apart from questions.yaml so
+# the 35 gold questions stay exactly the 35.
+#
+# Same fields as questions.yaml, plus:
+#   sources          where the key points were checked: the primary source first
+#   checked          the date the key points were checked against those sources
+#   time_sensitive   the answer can change (a new release, record, measurement or edition).
+#                    run_eval.py skips such a question once `checked` is older than
+#                    refresh_after_days (below, or the question's own), until its key points
+#                    are checked again and the date updated; --include-stale runs it anyway.
+#   expected_sources only where part of the answer is in the library (web-10)
+#
+# Groups: current (changes over time), outside (stable, but not in the library), library+web.
+# Drafted 2026-11-04; questions and key points approved by the user on 2026-11-04, with their
+# corrections (web-01, web-02); web-11 kept as an 11th question.
+#   grading_note     an extra instruction to graders for this question (web-11: resolve each work)
+
+refresh_after_days: 30
+
+docs:
+  - &sparse "1904.10509v1.pdf"
+
+questions:
+
+  # --- Current: the answer changes over time -------------------------------------
+
+  - id: web-01
+    status: approved
+    category: current
+    group: current
+    time_sensitive: true
+    checked: "2026-11-04"
+    question: "What is the current Particle Data Group world average for the W boson mass, with its uncertainty, and how does the CDF 2022 measurement compare to it?"
+    sources:
+      - "https://pdglive.lbl.gov/DataBlock.action?node=S043M (Review of Particle Physics, 2026 edition)"
+    key_points:
+      - "The PDG 2026 value is 80.3625 ± 0.0077 GeV (80362.5 ± 7.7 MeV), labelled OUR EVALUATION: the LHC-Tevatron W-mass working group's combination."
+      - "CDF 2022 measured 80.4335 GeV ± 9.4 MeV (± 6.4 stat ± 6.9 syst), about 70 MeV higher, a tension of roughly 6 standard deviations with the average."
+      - "The PDG does not use the CDF 2022 result in its evaluation (listed under data not used)."
+      - "The average rests on LEP, D0, ATLAS (2024), LHCb (2022) and CMS (80.3602 GeV; dating it 2024, when first presented, or 2026, when published, are both right) measurements, which agree with the Standard Model expectation."
+
+  - id: web-02
+    status: approved
+    category: current
+    group: current
+    time_sensitive: true
+    checked: "2026-11-04"
+    question: "Who received the 2026 Nobel Prize in Physics, and for what work?"
+    sources:
+      - "https://www.nobelprize.org/prizes/physics/2026/summary/ (returned 403 to the fetcher; checked through the wire coverage below)"
+      - "https://dailymaverick.co.za/article/2026-10-06-francis-halzen-wins-2026-nobel-prize-in-physics (Reuters)"
+      - "https://physicsworld.com/a/francis-halzen-wins-nobel-prize-in-physics/ (UW-Madison, IceCube PI; it says \"since 1991\", but Charpak won alone in 1992: corrected by the user)"
+    key_points:
+      - "Francis Halzen, a Belgian-American particle physicist at the University of Wisconsin-Madison and principal investigator of IceCube; the whole prize, the first sole physics laureate since 1992 (Georges Charpak)."
+      - "Motivation: \"for decisive contributions to the IceCube Neutrino Observatory and the discovery of high-energy neutrinos of astrophysical origin\"."
+      - "Announced on 6 October 2026 by the Royal Swedish Academy of Sciences. Optional: the prize is 12 million Swedish crowns."
+
+  - id: web-03
+    status: approved
+    category: current
+    group: current
+    time_sensitive: true
+    checked: "2026-11-04"
+    question: "What is the latest stable PyTorch release, and which Python versions does it support?"
+    sources:
+      - "https://github.com/pytorch/pytorch/releases/latest"
+    key_points:
+      - "PyTorch 2.15.0, released 28 October 2026."
+      - "It supports Python 3.11 to 3.15; the free-threaded 3.15t build is marked experimental."
+      - "Python 3.10 support was dropped (no cp310 wheels); 3.10 users must upgrade or stay on 2.14."
+
+  - id: web-04
+    status: approved
+    category: current
+    group: current
+    time_sensitive: true
+    checked: "2026-11-04"
+    question: "According to the USGS, what was the largest earthquake worldwide in October 2026: where, when, and what magnitude?"
+    sources:
+      - "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2026-10-01&endtime=2026-11-01&minmagnitude=6.5&orderby=magnitude"
+    key_points:
+      - "M 7.7 (Mww), 10 km WSW of Pitaloza Arriba, Panama, on 9 October 2026 at 17:56 UTC, about 10 km deep (USGS event us6000u18k)."
+      - "The next largest that month were M 7.0 in Tibet (189 km ENE of Nagqu, China, 22 October) and two M 6.9 events (Vanuatu, 24 October; off Kamchatka, Russia, 16 October); naming them is not required."
+
+  - id: web-05
+    status: approved
+    category: current
+    group: current
+    time_sensitive: true
+    checked: "2026-11-04"
+    question: "What does Anthropic currently charge per million input and output tokens for Claude Opus 5.5 and Claude Sonnet 5.5?"
+    sources:
+      - "https://platform.claude.com/docs/en/about-claude/pricing"
+    key_points:
+      - "Claude Opus 5.5: $4 per million input tokens and $20 per million output tokens."
+      - "Claude Sonnet 5.5: $2 per million input tokens and $10 per million output tokens."
+      - "Optional detail: cache hits cost 0.05x the input price ($0.20 and $0.10); 5-minute cache writes $5 and $2.50."
+
+  # --- Outside the library, stable -------------------------------------------------
+
+  - id: web-06
+    status: approved
+    category: outside
+    group: outside
+    checked: "2026-11-04"
+    question: "In \"Attention Is All You Need\" (Vaswani et al., 2017), what BLEU scores did the big Transformer reach on WMT 2014 English-to-German and English-to-French, and how long did training take on what hardware?"
+    sources:
+      - "https://arxiv.org/abs/1706.03762 (v7)"
+    key_points:
+      - "28.4 BLEU on WMT 2014 English-to-German."
+      - "41.8 or 41.0 BLEU on WMT 2014 English-to-French, a new single-model state of the art; either counts (v7's abstract and Table 2 say 41.8, its body text and the first version 41.0)."
+      - "Trained for 3.5 days on eight GPUs (P100)."
+
+  - id: web-07
+    status: approved
+    category: outside
+    group: outside
+    checked: "2026-11-04"
+    question: "What is the CODATA 2022 recommended value of the fine-structure constant, and its relative standard uncertainty?"
+    sources:
+      - "https://physics.nist.gov/cgi-bin/cuu/Value?alph"
+    key_points:
+      - "α = 7.297 352 5643(11) × 10⁻³ (CODATA 2022)."
+      - "Relative standard uncertainty 1.6 × 10⁻¹⁰."
+      - "Optional: the inverse is α⁻¹ = 137.035 999 177(21)."
+
+  - id: web-08
+    status: approved
+    category: outside
+    group: outside
+    time_sensitive: true
+    checked: "2026-11-04"
+    question: "What is KATRIN's most recent upper limit on the neutrino mass, at what confidence level, and from how much data?"
+    sources:
+      - "https://www.mpi-hd.mpg.de/mpi/en/public-relations/news/news-item/katrin-sets-new-limit-for-neutrino-mass"
+      - "KATRIN Collaboration, Science 388, 180-185 (2025), \"Direct neutrino-mass measurement based on 259 days of KATRIN data\" (the 90% CL is the paper's; the MPI-HD news item gives the limit without it)"
+    key_points:
+      - "m_ν < 0.45 eV at 90% confidence level (published in Science, 2025)."
+      - "From 259 days of data in five measurement campaigns (2019-2021), about a quarter of KATRIN's planned data, and almost twice as tight as the 0.8 eV limit of 2022."
+      - "It is a direct, model-independent measurement from the tritium beta-decay spectrum near its endpoint."
+
+  - id: web-09
+    status: approved
+    category: outside
+    group: outside
+    checked: "2026-11-04"
+    question: "How do I remove the instrument response from a seismogram with ObsPy? Which method and arguments, and what does the documentation recommend?"
+    sources:
+      - "https://docs.obspy.org/packages/autogen/obspy.core.trace.Trace.remove_response.html"
+    key_points:
+      - "Trace.remove_response (or Stream.remove_response) with an inventory holding the station's response: remove_response(inventory=inv, output=\"VEL\", water_level=60, pre_filt=None, zero_mean=True, taper=True, taper_fraction=0.05, plot=False)."
+      - "output is \"DISP\" (m), \"VEL\" (m/s, the default), \"ACC\" (m/s²) or \"DEF\" (the response's own units)."
+      - "pre_filt (four corner frequencies f1<f2<f3<f4 of a cosine taper) and water_level (dB, clips the inverse spectrum) both guard against over-amplification when inverting the response."
+      - "The documentation advises water_level=None with pre_filt when the requested output isn't the sensor's native quantity (e.g. velocity from an accelerometer), and plot=True to check the choices."
+
+  # --- Library plus web ---------------------------------------------------------------
+
+  - id: web-10
+    status: approved
+    category: library+web
+    group: library+web
+    time_sensitive: true
+    checked: "2026-11-04"
+    question: "The Sparse Transformers paper in my library reports a result on enwik8. What did it report, and what is the current Hutter Prize record for compressing enwik9?"
+    expected_sources:
+      - doc: *sparse
+        pages: [7, 8]
+    sources:
+      - "library: Child et al., Generating Long Sequences with Sparse Transformers, pp. 7-8 (chunks 2148, 2149)"
+      - "https://www.hutter1.net/prize/index.htm"
+    key_points:
+      - "Library: the Sparse Transformer (95M parameters, fixed attention) reaches 0.99 bits per byte on enwik8 (0.992 ± 0.001 over three seeds), beating the 1.03 of a similarly sized Transformer-XL and matching a Transformer-XL with more than twice the parameters."
+      - "Web: the Hutter Prize record is 100,424,672 bytes in total (archive plus decompressor) by Vladimir Ivanov with fx2-cmix-T, 24 July 2026; the next award needs under 99,420,425 bytes."
+      - "The two aren't directly comparable: Hutter uses enwik9 (1 GB) and counts the decompressor; the record is about 0.80 bits per byte."
+
+  # --- The user's 11th question --------------------------------------------------------
+
+  - id: web-11
+    status: approved
+    category: current
+    group: current
+    time_sensitive: true
+    checked: "2026-11-04"
+    question: "What has been published on foundation models for seismic waveforms since 2025, and what do they claim?"
+    sources:
+      - "U-Trans: Scientific Reports (published online 9 March 2026), doi 10.1038/s41598-026-41454-x; https://pubmed.ncbi.nlm.nih.gov/41803205/"
+      - "https://arxiv.org/abs/2610.38003 (Laurenti, Liu, Kulis, Meier, Johnson; 27 October 2026)"
+      - "https://arxiv.org/abs/2608.05763 (Alfarhan, Ravasi, Chen, Turkiyyah, Keyes; 6 August 2026)"
+      - "https://arxiv.org/abs/2410.15765 (SeisLM, Liu et al., first posted October 2024)"
+    grading_note: "This question is graded on its own rule, not on a share of the key points: good means at least three real works from 2025 on, each with its claims right, and none invented. Any real work counts, not only the examples below. Before counting any work an answer cites, check that it exists: its DOI (https://doi.org/...) or arXiv ID (https://arxiv.org/abs/...) must resolve to that title. A work you can't resolve counts as invented, which is a factual error. Real works found on 4 November 2026, as examples: U-Trans (Scientific Reports, 2026): a U-Net encoder-decoder with a compact convolutional transformer bottleneck, pretrained self-supervised to reconstruct corrupted three-component waveforms in time and frequency, on more than 2 million seismograms from three open datasets, then used for downstream earthquake tasks. | \"Are Seismic Foundation Models More Than Glorified Feature Extractors?\" (Laurenti et al., arXiv, October 2026): Mamba encoder-decoders tested frozen on picking, classification and ground-motion tasks; changing the pretraining target redistributes skill rather than raising it; they win few-shot but trail task-specific models with full data; the authors conclude they are feature extractors rather than foundation models, and that a target defined across events is needed. | Foundation Model-Assisted Full Waveform Inversion (Alfarhan et al., arXiv, August 2026): a frozen SeisLM encoder defines a feature-based misfit with a broader basin than L2, reducing cycle skipping in early-stage FWI (Marmousi, 2D and 3D Overthrust); best as an early-stage objective, not a replacement for waveform misfits."
+    key_points:
+      - "At least three real works from 2025 on, each with its claims right, and none invented."
+      - "SeisLM (Liu et al.), the self-supervised waveform model the FWI work builds on, dates from October 2024; citing it as 2025 work is an error."

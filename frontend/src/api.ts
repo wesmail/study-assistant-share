@@ -368,6 +368,18 @@ export function removeDocument(docId: number): Promise<{ removed: RemovalPreview
   return post(`/api/documents/${docId}/remove`);
 }
 
+/** Add a PDF or a deck to library/, as it is and under its own name. The server checks it and
+ * never overwrites a file; the worker then reads it as if it had been copied in. */
+export async function uploadDocument(file: File): Promise<{ name: string; size: number }> {
+  const response = await fetch(`/api/library/files/${encodeURIComponent(file.name)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: file,
+  });
+  if (!response.ok) throw await failure(response);
+  return response.json();
+}
+
 /** Write the document's metadata.yaml entry. */
 export function saveDetails(docId: number, details: DocumentDetails): Promise<DocumentDetails> {
   return post(`/api/documents/${docId}/details`, details);

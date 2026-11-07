@@ -28,7 +28,7 @@ from pathlib import Path
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -38,7 +38,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.chat import answer_events, exportable_answer, last_citations, last_turn, recent_history
 from app.config import ROOT, AnswerOption, Settings, load_settings
 from app.db.connection import connect
-from app import anchors, annotated, annotations, errors, explain, feedback, library, notes, office, suggest
+from app import anchors, annotated, annotations, errors, explain, feedback, library, notes, office, suggest, upload
 from app.ingest import deck, figures, metadata
 from app.ingest.embed import embed_texts
 from app.llm.hosted import MILLION, month_spend, turn_cost
@@ -674,6 +674,15 @@ def create_app(
                     "metadata_problem": metadata.problem(settings.library_dir)}
         finally:
             conn.close()
+
+    @app.put("/api/library/files/{name}")
+    async def add_document(name: str, request: Request) -> dict:
+        """Add a PDF or a deck from the browser: it streams into library/ under its own name,
+        checked, never overwriting a file (app/upload.py). The watcher takes it from there."""
+        try:
+            return await upload.save_upload(settings, name, request.stream(), request.headers.get("content-length"))
+        except upload.UploadError as error:
+            raise HTTPException(error.status, str(error)) from None
 
     @app.put("/api/library/settings")
     def library_settings(body: dict) -> dict:

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   approveFigures,
   fetchDetails,
@@ -6,6 +6,7 @@ import {
   removeDocument,
   saveDetails,
   skipFigures,
+  uploadDocument,
   type DocumentDetails,
   type DocumentRow,
   type RemovalPreview,
@@ -332,6 +333,7 @@ export function LibraryPane() {
               ? "Searching everything but the test collection"
               : "Searching everything"}
         </p>
+        <AddDocuments />
         {testBooks > 0 && (
           <label className="mt-1.5 flex items-center gap-1.5 text-xs text-stone-600">
             <input
@@ -354,6 +356,59 @@ export function LibraryPane() {
   );
 }
 
+
+type Upload = { name: string; state: "adding" | "added" | "failed"; message?: string };
+
+const ACCEPTED = ".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+/** The Add button: PDFs and decks go to library/ one after another, each with its own line. */
+function AddDocuments() {
+  const loadDocuments = useStore((state) => state.loadDocuments);
+  const input = useRef<HTMLInputElement>(null);
+  const [uploads, setUploads] = useState<Upload[]>([]);
+  const busy = uploads.some((upload) => upload.state === "adding");
+  const show = (next: Upload) =>
+    setUploads((current) => [...current.filter((upload) => upload.name !== next.name), next]);
+
+  async function add(files: File[]) {
+    for (const file of files) {
+      show({ name: file.name, state: "adding" });
+      try {
+        await uploadDocument(file);
+        show({ name: file.name, state: "added" });
+      } catch (error) {
+        show({ name: file.name, state: "failed", message: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    void loadDocuments();
+  }
+
+  return (
+    <div className="mt-1.5">
+      <button type="button" disabled={busy} onClick={() => input.current?.click()} data-testid="add-documents"
+        className="rounded border border-stone-300 bg-white px-2 py-0.5 text-xs text-stone-700 hover:bg-stone-50 disabled:text-stone-400">
+        Add PDF or deck…
+      </button>
+      <input ref={input} type="file" accept={ACCEPTED} multiple hidden data-testid="add-documents-input"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          event.target.value = "";        // the same file can be chosen again after a failure
+          void add(files);
+        }} />
+      {uploads.length > 0 && (
+        <ul className="mt-1 space-y-0.5 text-xs" data-testid="upload-status">
+          {uploads.map((upload) => (
+            <li key={upload.name} className={upload.state === "failed" ? "text-amber-800" : "text-stone-600"}>
+              {upload.state === "adding" && `Adding ${upload.name}…`}
+              {upload.state === "added" && `Added ${upload.name}: it is read next, and shows below.`}
+              {upload.state === "failed" && `Not added: ${upload.message}`}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const THEME_LABELS: Record<Theme, string> = { light: "Light", dark: "Dark", system: "System" };
 

@@ -226,7 +226,11 @@ describe("short author lists", () => {
 });
 
 function document_text(): string {
-  return globalThis.document.body.innerHTML;
+  // All of the page, attributes included, but the Add button's file picker: its accept=".pdf,.pptx"
+  // names file types, not a document.
+  const copy = globalThis.document.body.cloneNode(true) as HTMLElement;
+  copy.querySelector('[data-testid="add-documents-input"]')?.remove();
+  return copy.innerHTML;
 }
 
 describe("the theme switch", () => {
@@ -243,5 +247,40 @@ describe("the theme switch", () => {
     fireEvent.click(screen.getByTestId("theme-system"));
     expect(window.document.documentElement.dataset.theme).toBe("light");     // jsdom's "system" is light
     window.localStorage.clear();
+  });
+});
+
+describe("adding documents", () => {
+  const choose = (files: File[]) =>
+    fireEvent.change(screen.getByTestId("add-documents-input"), { target: { files } });
+
+  it("sends each chosen file as it is, under its own name, then refreshes the library", async () => {
+    const fetch = vi.fn(async (url: string, _init?: RequestInit) =>
+      new Response(JSON.stringify({ name: decodeURIComponent(url.split("/").pop()!), size: 3 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    const loadDocuments = vi.fn(async () => undefined);
+    useStore.setState({ loadDocuments });
+    render(<LibraryPane />);
+    const book = new File(["%PDF-1"], "My Book (2nd ed.).pdf", { type: "application/pdf" });
+    const talk = new File(["PK"], "talk.pptx");
+    choose([book, talk]);
+    await waitFor(() => expect(screen.getByTestId("upload-status").textContent).toContain("Added talk.pptx"));
+    expect(fetch.mock.calls.map((call) => call[0])).toEqual([
+      "/api/library/files/My%20Book%20(2nd%20ed.).pdf", "/api/library/files/talk.pptx"]);
+    const init = fetch.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe(book);
+    expect(screen.getByTestId("upload-status").textContent).toContain("Added My Book (2nd ed.).pdf");
+    expect(loadDocuments).toHaveBeenCalled();
+  });
+
+  it("says why a file wasn't added", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response('{"detail": "There is already a file called book.pdf in the library"}', { status: 409 })));
+    useStore.setState({ loadDocuments: vi.fn(async () => undefined) });
+    render(<LibraryPane />);
+    choose([new File(["%PDF-1"], "book.pdf")]);
+    await waitFor(() => expect(screen.getByTestId("upload-status").textContent).toBe(
+      "Not added: There is already a file called book.pdf in the library"));
   });
 });

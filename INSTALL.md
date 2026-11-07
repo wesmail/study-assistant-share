@@ -126,7 +126,7 @@ The app reads the keys only from this file, never from the environment, and neve
 
 ## 7. First run
 
-Put PDFs or PowerPoint decks in `library/`, then:
+Put PDFs or PowerPoint decks in `library/` (or add them later with the library pane's **Add PDF or deck…** button), then:
 
 ```bash
 scripts/start.sh

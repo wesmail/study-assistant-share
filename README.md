@@ -135,7 +135,7 @@ Feedback, notes, highlights and the chat history stay in `data/` on your machine
 
 ## Using it
 
-- **Add documents:** copy PDFs or `.pptx` decks into `library/`. From Windows, that folder is `\\wsl.localhost\Ubuntu-26.04\home\<you>\study-assistant\library`. The app picks them up while running; the library pane shows each document's stage, and a document is searchable once it's indexed. Parsing uses the GPU, so local answers run slower meanwhile: add books overnight, or use Deep while they parse.
+- **Add documents:** click **Add PDF or deck…** at the top of the library pane, or copy PDFs or `.pptx` decks into `library/` yourself. The button never replaces a file that is already there, and refuses a document already in the library under another name; up to 200 MB a file (`upload_max_bytes`). From Windows, that folder is `\\wsl.localhost\Ubuntu-26.04\home\<you>\study-assistant\library`. The app picks them up while running; the library pane shows each document's stage, and a document is searchable once it's indexed. Parsing uses the GPU, so local answers run slower meanwhile: add books overnight, or use Deep while they parse.
 - **Titles and kept-out pages:** a title comes from the file's metadata or its first page, never from the file name. Correct it in the library pane, which writes `library/metadata.yaml`. You can also edit that file:
   ```yaml
   my-talk.pptx:

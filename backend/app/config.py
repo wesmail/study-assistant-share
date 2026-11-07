@@ -242,6 +242,7 @@ class Settings:
     office_seconds: int = 180               # one render; a big deck takes tens of seconds
     office_memory: str = "3g"
     office_max_bytes: int = 200 * 1024 * 1024   # a larger file isn't opened at all
+    upload_max_bytes: int = 200 * 1024 * 1024   # the library pane's Add button (app/upload.py)
     office_max_unpacked_bytes: int = 1024 * 1024 * 1024     # by the zip's own directory
     office_max_slides: int = 600
     hosted_model: str = "claude-opus-5-5"

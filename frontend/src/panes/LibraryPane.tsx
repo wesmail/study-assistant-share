@@ -7,9 +7,15 @@ import {
   saveDetails,
   skipFigures,
   uploadDocument,
+  setAsideDocument,
+  restoreRemoved,
+  fetchEmptyPreview,
+  emptyRemoved,
   type DocumentDetails,
   type DocumentRow,
+  type EmptyPreview,
   type RemovalPreview,
+  type RemovedFile,
 } from "../api";
 import { searchedDocuments, useStore } from "../store/store";
 import { THEMES, useTheme } from "../theme";
@@ -256,6 +262,143 @@ function RemoveDocument({ document, onDone }: { document: DocumentRow; onDone: (
   );
 }
 
+/** Run one pane action: busy while it runs, its error kept to show. */
+function useAction(): [boolean, string | null, (action: () => Promise<void>) => Promise<void>] {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+    } catch (failure) {
+      setError(String(failure instanceof Error ? failure.message : failure));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return [busy, error, run];
+}
+
+/** Remove…: the file moves to library/.removed/, the document leaves search, nothing is deleted. */
+function SetAside({ document, onDone }: { document: DocumentRow; onDone: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, error, run] = useAction();
+  if (!asking) {
+    return (
+      <button type="button" className="mt-1 text-xs text-stone-500 underline hover:text-stone-800"
+        data-testid="set-aside" onClick={() => setAsking(true)}>
+        Remove…
+      </button>
+    );
+  }
+  return (
+    <div className="mt-2 rounded border border-stone-300 bg-white p-2 text-xs" data-testid="set-aside-confirm">
+      <p>
+        Its file moves to <code>library/.removed/</code>, from where you can restore it. It leaves search at once; its
+        index, highlights and notes are kept until you empty removed files.
+      </p>
+      {document.collection === "test" && (
+        <p className="mt-1 text-amber-800" data-testid="test-warning">
+          It's in the test collection: the gold questions and the recall checks use it.
+        </p>
+      )}
+      <div className="mt-1.5 flex gap-2">
+        <button type="button" disabled={busy} className="rounded bg-stone-700 px-2 py-0.5 text-white disabled:opacity-50"
+          onClick={() => run(async () => {
+            await setAsideDocument(document.id);
+            onDone();
+          })}>
+          Remove
+        </button>
+        <button type="button" className="rounded border border-stone-300 bg-white px-2 py-0.5" onClick={() => setAsking(false)}>
+          Keep
+        </button>
+      </div>
+      {error && <p className="mt-1 text-red-700">{error}</p>}
+    </div>
+  );
+}
+
+/** Moves a removed file back; the worker then restores its document as it was. */
+function RestoreButton({ entry, onDone }: { entry: string; onDone: () => void }) {
+  const [busy, error, run] = useAction();
+  const [done, setDone] = useState(false);
+  return (
+    <span>
+      <button type="button" disabled={busy || done} data-testid="restore"
+        className="rounded border border-teal-700 bg-white px-2 py-0.5 text-teal-800 disabled:opacity-50"
+        onClick={() => run(async () => {
+          await restoreRemoved(entry);
+          setDone(true);
+          onDone();
+        })}>
+        {done ? "Restoring…" : "Restore"}
+      </button>
+      {error && <span className="ml-2 text-red-700">{error}</span>}
+    </span>
+  );
+}
+
+/** The files in library/.removed/: restore one, or empty them all, which is the only deleting step. */
+function RemovedFiles({ files, documents, onDone }: { files: RemovedFile[]; documents: DocumentRow[];
+  onDone: () => void }) {
+  const [preview, setPreview] = useState<EmptyPreview | null>(null);
+  const [busy, error, run] = useAction();
+  if (files.length === 0) return null;
+  const shown = new Set(documents.map((document) => document.removed_as).filter(Boolean));
+  const loose = files.filter((file) => !shown.has(file.entry));     // their document's index is gone
+  return (
+    <div className="border-t border-stone-200 p-3 text-xs" data-testid="removed-files">
+      <p className="text-stone-600">
+        {files.length} removed {files.length === 1 ? "file" : "files"} in <code>library/.removed/</code>
+      </p>
+      {loose.length > 0 && (
+        <ul className="mt-1 space-y-1">
+          {loose.map((file) => (
+            <li key={file.entry} className="flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate" title={file.path}>{file.path}</span>
+              <RestoreButton entry={file.entry} onDone={onDone} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {!preview ? (
+        <button type="button" disabled={busy} data-testid="empty-removed"
+          className="mt-1.5 rounded border border-stone-300 bg-white px-2 py-0.5 disabled:opacity-50"
+          onClick={() => run(async () => setPreview(await fetchEmptyPreview()))}>
+          Empty removed files…
+        </button>
+      ) : (
+        <div className="mt-1.5 rounded border border-amber-300 bg-amber-50 p-2" data-testid="empty-confirm">
+          <p className="font-semibold">This deletes for good:</p>
+          <ul className="ml-4 list-disc">
+            <li>{preview.files.length} {preview.files.length === 1 ? "file" : "files"} ({megabytes(preview.bytes)}): {preview.files.map((file) => file.path).join(", ")}</li>
+            {preview.documents.length > 0 && (
+              <li>the index, highlights and cached descriptions and summaries of: {preview.documents.map((d) => d.title).join(", ")}</li>
+            )}
+          </ul>
+          {preview.notes_kept > 0 && <p className="mt-1">Kept: {preview.notes_kept} notes, no longer tied to a document.</p>}
+          <div className="mt-1.5 flex gap-2">
+            <button type="button" disabled={busy} className="rounded bg-red-700 px-2 py-0.5 text-white disabled:opacity-50"
+              onClick={() => run(async () => {
+                await emptyRemoved();
+                setPreview(null);
+                onDone();
+              })}>
+              Empty
+            </button>
+            <button type="button" className="rounded border border-stone-300 bg-white px-2 py-0.5" onClick={() => setPreview(null)}>
+              Keep
+            </button>
+          </div>
+        </div>
+      )}
+      {error && <p className="mt-1 text-red-700">{error}</p>}
+    </div>
+  );
+}
+
 function DocumentItem({ document }: { document: DocumentRow }) {
   const scope = useStore((state) => state.scope);
   const toggleScope = useStore((state) => state.toggleScope);
@@ -302,7 +445,14 @@ function DocumentItem({ document }: { document: DocumentRow }) {
         )}
         {document.waiting?.stage === "describe" && <FiguresOk document={document} onDone={refresh} />}
         {document.needs_details && <DetailsForm document={document} onDone={refresh} />}
+        {state === "removed" && document.removed_as && (
+          <div className="mt-2 text-xs" data-testid="removed-note">
+            <p className="mb-1 text-stone-600">Removed: its file is in <code>library/.removed/</code>.</p>
+            <RestoreButton entry={document.removed_as} onDone={refresh} />
+          </div>
+        )}
         {state === "removed" && <RemoveDocument document={document} onDone={refresh} />}
+        {state !== "removed" && <SetAside document={document} onDone={refresh} />}
       </div>
     </li>
   );
@@ -313,6 +463,8 @@ export function LibraryPane() {
   const error = useStore((state) => state.libraryError);
   const hideTest = useStore((state) => state.hideTest);
   const setHideTest = useStore((state) => state.setHideTest);
+  const removedFiles = useStore((state) => state.removedFiles);
+  const loadDocuments = useStore((state) => state.loadDocuments);
   // A count, because searchedDocuments can return a new list each time, and a selector
   // that always returns something new makes the page render forever.
   const searched = useStore((state) => searchedDocuments(state)?.length ?? 0);
@@ -352,6 +504,7 @@ export function LibraryPane() {
           <DocumentItem key={document.id} document={document} />
         ))}
       </ul>
+      <RemovedFiles files={removedFiles} documents={documents} onDone={() => void loadDocuments()} />
     </aside>
   );
 }

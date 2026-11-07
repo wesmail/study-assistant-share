@@ -38,7 +38,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.chat import answer_events, exportable_answer, last_citations, last_turn, recent_history
 from app.config import ROOT, AnswerOption, Settings, load_settings
 from app.db.connection import connect
-from app import anchors, annotated, annotations, errors, explain, feedback, library, notes, office, suggest, upload
+from app import anchors, annotated, annotations, errors, explain, feedback, library, notes, office, removed, suggest, upload
 from app.ingest import deck, figures, metadata
 from app.ingest.embed import embed_texts
 from app.llm.hosted import MILLION, month_spend, turn_cost
@@ -87,6 +87,10 @@ class ReaderImage(BaseModel):
     """A screenshot or picture the reader pasted or uploaded, for this question only."""
     media_type: str
     data: str = Field(min_length=1)             # base64
+
+
+class RemovedEntry(BaseModel):
+    entry: str = Field(max_length=1000)
 
 
 class ChatRequest(BaseModel):
@@ -670,8 +674,13 @@ def create_app(
         """Each document with where it is in the queued flow (app/library.py), and the library settings."""
         conn = connect(settings.db_path, apply_schema=False)
         try:
-            return {"documents": library.library_rows(conn, settings), "settings": library.library_settings(conn),
-                    "metadata_problem": metadata.problem(settings.library_dir)}
+            rows = library.library_rows(conn, settings)
+            set_aside = removed.removed_files(settings)
+            latest = {item["path"]: item["entry"] for item in set_aside}     # sorted by time: the last wins
+            for row in rows:
+                row["removed_as"] = latest.get(row["path"]) if row["status"] == "missing" else None
+            return {"documents": rows, "settings": library.library_settings(conn),
+                    "metadata_problem": metadata.problem(settings.library_dir), "removed": set_aside}
         finally:
             conn.close()
 
@@ -712,6 +721,33 @@ def create_app(
     def skip_figures(doc_id: int) -> dict:
         library_action(doc_id, lambda conn, doc: library.skip_figures(conn, doc_id))
         return {"ok": True}
+
+    @app.post("/api/documents/{doc_id}/set-aside")
+    def set_aside(doc_id: int) -> dict:
+        """Move a document's file into library/.removed/: out of search, everything kept (app/removed.py)."""
+        return library_action(doc_id, lambda conn, doc: removed.set_aside(conn, settings, doc))
+
+    @app.post("/api/library/removed/restore")
+    def restore_removed(body: RemovedEntry) -> dict:
+        """Move a removed file back; the worker restores its document as it was."""
+        return removed.restore(settings, body.entry)
+
+    @app.get("/api/library/removed/empty")
+    def empty_removed_preview() -> dict:
+        conn = connect(settings.db_path, apply_schema=False)
+        try:
+            return removed.empty_preview(conn, settings)
+        finally:
+            conn.close()
+
+    @app.post("/api/library/removed/empty")
+    def empty_removed() -> dict:
+        """Delete the files in library/.removed/ and the index of their documents: the only deleting step."""
+        conn = connect(settings.db_path, apply_schema=False)
+        try:
+            return removed.empty(conn, settings)
+        finally:
+            conn.close()
 
     @app.get("/api/documents/{doc_id}/removal")
     def removal_preview(doc_id: int) -> dict:

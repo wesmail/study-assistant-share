@@ -82,6 +82,23 @@ export interface DocumentRow {
   collection?: string | null;
   /** No metadata.yaml entry yet: the pane asks for one. */
   needs_details?: boolean;
+  /** Its file was removed from the pane: where it waits in library/.removed/, to restore. */
+  removed_as?: string | null;
+}
+
+/** A file in library/.removed/: kept until the reader empties it. */
+export interface RemovedFile {
+  entry: string;
+  path: string;
+  removed_at: string;
+  bytes: number;
+}
+
+export interface EmptyPreview {
+  files: RemovedFile[];
+  bytes: number;
+  documents: { id: number; title: string }[];
+  notes_kept: number;
 }
 
 /** What removing a gone document deletes (GET /api/documents/{id}/removal). */
@@ -296,12 +313,13 @@ export interface LibrarySettings {
   hide_test_collection: boolean;
 }
 
-export async function fetchLibrary(): Promise<{ documents: DocumentRow[]; settings: LibrarySettings; metadataProblem: string | null }> {
+export async function fetchLibrary(): Promise<{ documents: DocumentRow[]; settings: LibrarySettings;
+  metadataProblem: string | null; removed: RemovedFile[] }> {
   const response = await fetch("/api/documents");
   if (!response.ok) throw new Error(`The server answered ${response.status}`);
   const body = await response.json();
   return { documents: body.documents, settings: body.settings ?? { hide_test_collection: false },
-    metadataProblem: body.metadata_problem ?? null };
+    metadataProblem: body.metadata_problem ?? null, removed: body.removed ?? [] };
 }
 
 export async function saveLibrarySettings(settings: Partial<LibrarySettings>): Promise<LibrarySettings> {
@@ -378,6 +396,27 @@ export async function uploadDocument(file: File): Promise<{ name: string; size: 
   });
   if (!response.ok) throw await failure(response);
   return response.json();
+}
+
+/** Move a document's file into library/.removed/: it leaves search, and everything is kept. */
+export function setAsideDocument(docId: number): Promise<{ removed_as: string }> {
+  return post(`/api/documents/${docId}/set-aside`);
+}
+
+/** Move a removed file back; the worker restores its document as it was. */
+export function restoreRemoved(entry: string): Promise<{ restored: string }> {
+  return post("/api/library/removed/restore", { entry });
+}
+
+export async function fetchEmptyPreview(): Promise<EmptyPreview> {
+  const response = await fetch("/api/library/removed/empty");
+  if (!response.ok) throw await failure(response);
+  return response.json();
+}
+
+/** Delete the files in library/.removed/ and their documents' index: the only deleting step. */
+export function emptyRemoved(): Promise<{ files: number; documents_removed: number[]; documents_kept: number[] }> {
+  return post("/api/library/removed/empty");
 }
 
 /** Write the document's metadata.yaml entry. */

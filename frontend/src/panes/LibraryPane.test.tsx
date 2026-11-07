@@ -284,3 +284,68 @@ describe("adding documents", () => {
       "Not added: There is already a file called book.pdf in the library"));
   });
 });
+
+describe("removing, restoring and emptying", () => {
+  const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+
+  it("Remove… asks first, says nothing is deleted, then moves the file aside", async () => {
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) => ok({ removed_as: "20261107-120000/b.pdf" }));
+    vi.stubGlobal("fetch", fetch);
+    const loadDocuments = vi.fn(async () => undefined);
+    useStore.setState({ documents: [document(7)], loadDocuments });
+    render(<LibraryPane />);
+    fireEvent.click(screen.getByTestId("set-aside"));
+    expect(screen.getByTestId("set-aside-confirm").textContent).toContain("from where you can restore it");
+    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Remove"));
+    await waitFor(() => expect(loadDocuments).toHaveBeenCalled());
+    expect(fetch.mock.calls[0][0]).toBe("/api/documents/7/set-aside");
+    expect(fetch.mock.calls[0][1]?.method).toBe("POST");
+  });
+
+  it("warns before removing a book of the test collection", () => {
+    useStore.setState({ documents: [{ ...document(7), collection: "test" }], hideTest: false });
+    render(<LibraryPane />);
+    fireEvent.click(screen.getByTestId("set-aside"));
+    expect(screen.getByTestId("test-warning").textContent).toContain("gold questions");
+  });
+
+  it("a removed document offers Restore, which moves its file back", async () => {
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) => ok({ restored: "b.pdf" }));
+    vi.stubGlobal("fetch", fetch);
+    const entry = "20261107-120000/b.pdf";
+    useStore.setState({ documents: [{ ...document(7), status: "missing", state: "removed", removed_as: entry }],
+      removedFiles: [{ entry, path: "b.pdf", removed_at: "20261107-120000", bytes: 10 }],
+      loadDocuments: vi.fn(async () => undefined) });
+    render(<LibraryPane />);
+    expect(screen.queryByTestId("set-aside")).toBeNull();
+    fireEvent.click(screen.getByTestId("restore"));
+    await waitFor(() => expect(screen.getByTestId("restore").textContent).toBe("Restoring…"));
+    expect(fetch.mock.calls[0][0]).toBe("/api/library/removed/restore");
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ entry });
+  });
+
+  it("Empty… shows what goes for good, and only then deletes", async () => {
+    const preview = { files: [{ entry: "s/old.pdf", path: "old.pdf", removed_at: "s", bytes: 2_000_000 }], bytes: 2_000_000,
+      documents: [{ id: 9, title: "Old Book" }], notes_kept: 2 };
+    const fetch = vi.fn(async (_url: string, init?: RequestInit) =>
+      ok(init?.method === "POST" ? { files: 1, documents_removed: [9], documents_kept: [] } : preview));
+    vi.stubGlobal("fetch", fetch);
+    const loadDocuments = vi.fn(async () => undefined);
+    useStore.setState({ documents: [], removedFiles: preview.files, loadDocuments });
+    render(<LibraryPane />);
+    expect(screen.getByTestId("removed-files").textContent).toContain("1 removed file");
+    fireEvent.click(screen.getByTestId("empty-removed"));
+    await waitFor(() => expect(screen.getByTestId("empty-confirm")).toBeTruthy());
+    const text = screen.getByTestId("empty-confirm").textContent!;
+    expect(text).toContain("This deletes for good");
+    expect(text).toContain("old.pdf");
+    expect(text).toContain("Old Book");
+    expect(text).toContain("Kept: 2 notes");
+    expect(fetch.mock.calls.map((call) => call[1]?.method ?? "GET")).toEqual(["GET"]);
+    fireEvent.click(screen.getByText("Empty"));
+    await waitFor(() => expect(loadDocuments).toHaveBeenCalled());
+    expect(fetch.mock.calls[1][0]).toBe("/api/library/removed/empty");
+    expect(fetch.mock.calls[1][1]?.method).toBe("POST");
+  });
+});

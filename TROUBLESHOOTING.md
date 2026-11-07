@@ -41,6 +41,8 @@ Fix the line; the app picks the file up again without a restart. `exclude_pages`
 
 **"Not added: …"** under **Add PDF or deck…**: the reason is in the message. A file with that name is already in `library/` (rename it, or remove the old one first), the same document is there under another name, it is over 200 MB (`upload_max_bytes` in `config.yaml`), or it isn't the PDF or `.pptx` deck its name says. Copying a file into `library/` yourself still works as before.
 
+**Remove… says "A job for this document is still running"**: wait until its stage (often summarizing) finishes, then try again. **Restore says "There is a file called … in the library again"**: a new file took the name; rename or remove it first. A removed file stays in `library/.removed/` until you empty it, and backups include it.
+
 **A document shows "failed"**: hover its row in the library pane for the stage and error. A stage is tried three times before the document is marked failed, and every finished stage is kept. Once the cause is fixed, stop the app and queue the library again from that stage. This queues every document, and each one is redone from that stage:
 
 ```bash

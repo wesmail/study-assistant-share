@@ -5,7 +5,7 @@ import type {
   ExplainResult,
   Note,
   Passage,
-  AnswerOption, AnswerSpend, CheckReport, DocumentRow, FeedbackEntry, Mode, MonthSpend, OutputFile, Rating,
+  AnswerOption, AnswerSpend, CheckReport, DocumentRow, FeedbackEntry, RemovedFile, Mode, MonthSpend, OutputFile, Rating,
   ReaderImage, Region, ReplacedAttempt, Source, SseEvent,
   UnverifiedCrop, WebProposal, WebSource,
 } from "../api";
@@ -130,6 +130,8 @@ interface ViewerTarget {
 
 interface State {
   documents: DocumentRow[];
+  /** The files in library/.removed/, waiting to be restored or emptied. */
+  removedFiles: RemovedFile[];
   libraryError: string | null;
   /** The reader's library setting: the test collection is left out of whole-library search and the pane. */
   hideTest: boolean;
@@ -280,6 +282,7 @@ export const useStore = create<State>((set, get) => {
 
   return {
     documents: [],
+    removedFiles: [],
     libraryError: null,
     hideTest: false,
     scope: [],
@@ -305,7 +308,8 @@ export const useStore = create<State>((set, get) => {
         // A broken metadata.yaml: ingestion waits and hosted Explain is refused until it is fixed (R2-C7).
         const problem = library.metadataProblem
           ? `${library.metadataProblem}. New files wait until it is fixed.` : null;
-        set({ documents: library.documents, hideTest: library.settings.hide_test_collection, libraryError: problem });
+        set({ documents: library.documents, removedFiles: library.removed, hideTest: library.settings.hide_test_collection,
+          libraryError: problem });
       } catch (error) {
         set({ libraryError: String(error) });
       }

@@ -458,6 +458,22 @@ class TestReadingFiles:
         with fitz.open(settings.outputs_dir / "out.pdf") as document:
             assert document[0].get_images()
 
+    @pytest.mark.parametrize("tool, suffix", [("make_pdf", "pdf"), ("make_docx", "docx")])
+    def test_a_figure_keeps_its_own_label_with_no_number_added(self, settings, tool, suffix):
+        """A Deep PDF read "Figure 1: Figure 5 (from the paper)": the template numbered it again."""
+        plot = run(settings, "import matplotlib.pyplot as plt\nplt.plot([1, 2])\nplt.show()").files[0]["name"]
+        outcome = build(settings, tool, f"# S\n\nText.\n\n![Figure 5: Phase error over the rollout.]({plot})\n",
+                        name=f"caption-{suffix}")
+        assert outcome.ok, outcome.text
+        path = settings.outputs_dir / f"caption-{suffix}.{suffix}"
+        if suffix == "pdf":
+            with fitz.open(path) as document:
+                text = " ".join(document[0].get_text().split())
+        else:
+            text = " ".join(paragraph.text for paragraph in __import__("docx").Document(path).paragraphs)
+        assert "Figure 5: Phase error over the rollout." in text
+        assert "Figure 1" not in text
+
     def test_a_list_under_a_sentence_is_a_list_in_the_pdf_not_asterisks(self, settings):
         """The bug report's PDF read "...ablations [S1][S2]: * Multi-token prediction (MTP): ..."."""
         outcome = build(settings, "make_pdf", "# S\n\nThree components:\n* **MTP:** first\n* **Head:** second\n")

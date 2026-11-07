@@ -71,6 +71,11 @@ PDF_THEME = rf"""
 \renewcommand{{\headrulewidth}}{{0pt}}
 \fancyfoot[R]{{\small\color{{muted}}\thepage}}
 \usepackage{{framed}}
+% A figure's caption keeps the source's own label ("Figure 5: ..."), so LaTeX adds no number of
+% its own: article's \@makecaption with "#1: #2" as "#2". Tables are longtables, with their own.
+\makeatletter
+\long\def\@makecaption#1#2{{\vskip\abovecaptionskip\sbox\@tempboxa{{#2}}\ifdim\wd\@tempboxa>\hsize #2\par\else\global\@minipagefalse\hb@xt@\hsize{{\hfil\box\@tempboxa\hfil}}\fi\vskip\belowcaptionskip}}
+\makeatother
 \renewenvironment{{quote}}{{\color{{muted}}\def\FrameCommand{{{{\color{{accent}}\vrule width 2pt}}\hspace{{10pt}}}}\MakeFramed{{\advance\hsize-\width\FrameRestore}}}}{{\endMakeFramed}}
 """
 IMAGE = re.compile(r"(!\[[^\]]*\]\()(images/[A-Za-z0-9._-]+)(\))")
